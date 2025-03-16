@@ -8,123 +8,194 @@ import {
   ListToolsRequestSchema,
   McpError,
   ServerResult,
+  CallToolRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import { FileHandler } from "./services/FileHandler.js";
 import {
-  CORE_FILES,
-  CoreFileName,
-  MemoryBankCommand,
-  MemoryBankConfig,
+  UpdateScriptCommand,
+  UpdateScriptConfig,
 } from "./types.js";
 
-const DEFAULT_CONFIG: MemoryBankConfig = {
-  rootPath: process.env.MEMORY_BANK_ROOT || "/memory-bank",
+// Use types to fix Node process and console references
+declare global {
+  namespace NodeJS {
+    interface ProcessEnv {
+      UPDATE_SCRIPT_ROOT?: string;
+      HOME?: string;
+      USERPROFILE?: string;
+    }
+  }
+}
+
+const DEFAULT_CONFIG: UpdateScriptConfig = {
+  rootPath: process.env.UPDATE_SCRIPT_ROOT || `${process.env.HOME || process.env.USERPROFILE}/.update-script`,
 };
 
-interface MemoryBankReadArgs {
-  projectName: string;
-  fileName: CoreFileName;
+interface RunUpdateArgs {
+  cwd?: string;
 }
 
-interface MemoryBankWriteArgs extends MemoryBankReadArgs {
-  content: string;
+interface WatchProjectArgs {
+  cwd?: string;
+  debounceMs?: number;
 }
 
-interface MemoryBankUpdateArgs extends MemoryBankReadArgs {
-  content: string;
+interface StopWatchingArgs {
+  cwd?: string;
 }
 
-const memoryBankTools = {
-  list_projects: {
-    name: "list_projects",
-    description: "List all projects in the memory bank",
+interface CustomTemplateJsArgs {
+  projectName?: string;
+  projectPath?: string;
+}
+
+interface AnalyzeDependenciesArgs {
+  cwd?: string;
+  format?: 'json' | 'markdown' | 'dot';
+  includeNodeModules?: boolean;
+  depth?: number;
+}
+
+interface GenerateMetricsArgs {
+  cwd?: string;
+  includeComplexity?: boolean;
+  includeCoverage?: boolean;
+  includeLocMetrics?: boolean;
+  outputFormat?: 'json' | 'markdown';
+}
+
+interface CreateVisualDiagramArgs {
+  cwd?: string;
+  type?: 'structure' | 'dependencies' | 'components' | 'all';
+  format?: 'mermaid' | 'dot' | 'svg' | 'png';
+  outputPath?: string;
+}
+
+const updateScriptTools = {
+  run_update: {
+    name: "run_update",
+    description: "Generate or update the project structure documentation",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd: { type: "string" },
+      },
+      required: [],
+    },
+  },
+  list_updates: {
+    name: "list_updates",
+    description: "List recent update operations",
     inputSchema: {
       type: "object",
       properties: {},
       required: [],
     },
   },
-  list_project_files: {
-    name: "list_project_files",
-    description: "List all files within a specific project",
+  watch_project: {
+    name: "watch_project",
+    description: "Start watching a project for changes and automatically update documentation",
     inputSchema: {
       type: "object",
       properties: {
-        projectName: { type: "string" },
+        cwd: { type: "string" },
+        debounceMs: { type: "number" }
       },
-      required: ["projectName"],
+      required: [],
     },
   },
-  memory_bank_read: {
-    name: "memory_bank_read",
-    description: "Read a memory bank file for a specific project",
+  stop_watching: {
+    name: "stop_watching",
+    description: "Stop watching a project for changes",
     inputSchema: {
       type: "object",
       properties: {
-        projectName: { type: "string" },
-        fileName: {
-          type: "string",
-          enum: CORE_FILES,
-        },
+        cwd: { type: "string" },
       },
-      required: ["projectName", "fileName"],
+      required: [],
     },
   },
-  memory_bank_write: {
-    name: "memory_bank_write",
-    description: "Create a new memory bank file for a specific project",
+  custom_template_js: {
+    name: "custom_template_js",
+    description: "Create a new JavaScript project from a template",
     inputSchema: {
       type: "object",
       properties: {
         projectName: { type: "string" },
-        fileName: {
-          type: "string",
-          enum: CORE_FILES,
-        },
-        content: { type: "string" },
+        projectPath: { type: "string" },
       },
-      required: ["projectName", "fileName", "content"],
+      required: [],
     },
   },
-  memory_bank_update: {
-    name: "memory_bank_update",
-    description: "Update an existing memory bank file for a specific project",
+  analyze_dependencies: {
+    name: "analyze_dependencies",
+    description: "Analyze project dependencies and generate a dependency graph",
     inputSchema: {
       type: "object",
       properties: {
-        projectName: { type: "string" },
-        fileName: {
-          type: "string",
-          enum: CORE_FILES,
-        },
-        content: { type: "string" },
+        cwd: { type: "string" },
+        format: { type: "string", enum: ["json", "markdown", "dot"] },
+        includeNodeModules: { type: "boolean" },
+        depth: { type: "number" },
       },
-      required: ["projectName", "fileName", "content"],
+      required: [],
+    },
+  },
+  generate_metrics: {
+    name: "generate_metrics",
+    description: "Generate code metrics including complexity, lines of code, etc.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd: { type: "string" },
+        includeComplexity: { type: "boolean" },
+        includeCoverage: { type: "boolean" },
+        includeLocMetrics: { type: "boolean" },
+        outputFormat: { type: "string", enum: ["json", "markdown"] },
+      },
+      required: [],
+    },
+  },
+  create_visual_diagram: {
+    name: "create_visual_diagram",
+    description: "Create visual diagrams of project structure, dependencies, or components",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd: { type: "string" },
+        type: { type: "string", enum: ["structure", "dependencies", "components", "all"] },
+        format: { type: "string", enum: ["mermaid", "dot", "svg", "png"] },
+        outputPath: { type: "string" },
+      },
+      required: [],
     },
   },
 };
 
-export class MemoryBankServer {
+export class UpdateScriptServer {
   private server: Server;
   private fileHandler: FileHandler;
 
-  constructor(config: Partial<MemoryBankConfig> = {}) {
+  constructor(config: Partial<UpdateScriptConfig> = {}) {
     const finalConfig = { ...DEFAULT_CONFIG, ...config };
     this.fileHandler = new FileHandler(finalConfig);
 
     this.server = new Server(
       {
-        name: "memory-bank",
+        name: "update-script",
         version: "0.1.0",
       },
       {
         capabilities: {
           tools: {
-            memory_bank_read: memoryBankTools.memory_bank_read,
-            memory_bank_write: memoryBankTools.memory_bank_write,
-            memory_bank_update: memoryBankTools.memory_bank_update,
-            list_projects: memoryBankTools.list_projects,
-            list_project_files: memoryBankTools.list_project_files,
+            run_update: updateScriptTools.run_update,
+            list_updates: updateScriptTools.list_updates,
+            watch_project: updateScriptTools.watch_project,
+            stop_watching: updateScriptTools.stop_watching,
+            custom_template_js: updateScriptTools.custom_template_js,
+            analyze_dependencies: updateScriptTools.analyze_dependencies,
+            generate_metrics: updateScriptTools.generate_metrics,
+            create_visual_diagram: updateScriptTools.create_visual_diagram,
           },
         },
       }
@@ -140,28 +211,29 @@ export class MemoryBankServer {
     });
   }
 
-  private validateArgs<T extends { fileName: CoreFileName }>(
-    args: Record<string, unknown>
-  ): T {
+  private validateArgs<T>(args: Record<string, unknown>): T {
     const validatedArgs = args as T;
-    // TODO: Validate args for future requirements
+    // Basic validation, can be extended later
     return validatedArgs;
   }
 
   private setupToolHandlers() {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: [
-        memoryBankTools.memory_bank_read,
-        memoryBankTools.memory_bank_write,
-        memoryBankTools.memory_bank_update,
-        memoryBankTools.list_projects,
-        memoryBankTools.list_project_files,
+        updateScriptTools.run_update,
+        updateScriptTools.list_updates,
+        updateScriptTools.watch_project,
+        updateScriptTools.stop_watching,
+        updateScriptTools.custom_template_js,
+        updateScriptTools.analyze_dependencies,
+        updateScriptTools.generate_metrics,
+        updateScriptTools.create_visual_diagram,
       ],
     }));
 
     this.server.setRequestHandler(
       CallToolRequestSchema,
-      async (request): Promise<ServerResult> => {
+      async (request: CallToolRequest): Promise<ServerResult> => {
         const { name, arguments: args } = request.params;
 
         if (!args || typeof args !== "object") {
@@ -169,53 +241,87 @@ export class MemoryBankServer {
         }
 
         try {
-          let command: MemoryBankCommand;
+          let command: UpdateScriptCommand;
 
           switch (name) {
-            case "list_projects": {
+            case "list_updates": {
               command = {
-                operation: "list_projects",
+                operation: "list_updates",
               };
               break;
             }
 
-            case "list_project_files": {
-              const { projectName } = args as { projectName: string };
+            case "run_update": {
+              const runArgs = this.validateArgs<RunUpdateArgs>(args);
               command = {
-                operation: "list_project_files",
-                projectName,
+                operation: "run_update",
+                cwd: runArgs.cwd,
               };
               break;
             }
 
-            case "memory_bank_read": {
-              const readArgs = this.validateArgs<MemoryBankReadArgs>(args);
+            case "watch_project": {
+              const watchArgs = this.validateArgs<WatchProjectArgs>(args);
               command = {
-                operation: "read",
-                projectName: readArgs.projectName,
-                fileName: readArgs.fileName,
+                operation: "watch_project",
+                cwd: watchArgs.cwd,
+                debounceMs: watchArgs.debounceMs,
               };
               break;
             }
 
-            case "memory_bank_write": {
-              const writeArgs = this.validateArgs<MemoryBankWriteArgs>(args);
+            case "stop_watching": {
+              const stopArgs = this.validateArgs<StopWatchingArgs>(args);
               command = {
-                operation: "write",
-                projectName: writeArgs.projectName,
-                fileName: writeArgs.fileName,
-                content: writeArgs.content,
+                operation: "stop_watching",
+                cwd: stopArgs.cwd,
               };
               break;
             }
 
-            case "memory_bank_update": {
-              const updateArgs = this.validateArgs<MemoryBankUpdateArgs>(args);
+            case "custom_template_js": {
+              const templateArgs = this.validateArgs<CustomTemplateJsArgs>(args);
               command = {
-                operation: "update",
-                projectName: updateArgs.projectName,
-                fileName: updateArgs.fileName,
-                content: updateArgs.content,
+                operation: "custom_template_js",
+                projectName: templateArgs.projectName,
+                projectPath: templateArgs.projectPath,
+              };
+              break;
+            }
+
+            case "analyze_dependencies": {
+              const dependencyArgs = this.validateArgs<AnalyzeDependenciesArgs>(args);
+              command = {
+                operation: "analyze_dependencies",
+                cwd: dependencyArgs.cwd,
+                format: dependencyArgs.format,
+                includeNodeModules: dependencyArgs.includeNodeModules,
+                depth: dependencyArgs.depth,
+              };
+              break;
+            }
+
+            case "generate_metrics": {
+              const metricsArgs = this.validateArgs<GenerateMetricsArgs>(args);
+              command = {
+                operation: "generate_metrics",
+                cwd: metricsArgs.cwd,
+                includeComplexity: metricsArgs.includeComplexity,
+                includeCoverage: metricsArgs.includeCoverage,
+                includeLocMetrics: metricsArgs.includeLocMetrics,
+                outputFormat: metricsArgs.outputFormat,
+              };
+              break;
+            }
+
+            case "create_visual_diagram": {
+              const diagramArgs = this.validateArgs<CreateVisualDiagramArgs>(args);
+              command = {
+                operation: "create_visual_diagram",
+                cwd: diagramArgs.cwd,
+                type: diagramArgs.type,
+                format: diagramArgs.format,
+                outputPath: diagramArgs.outputPath,
               };
               break;
             }
@@ -249,11 +355,13 @@ export class MemoryBankServer {
           if (error instanceof McpError) {
             throw error;
           }
+
+          console.error("[Tool Error]", error);
           throw new McpError(
             ErrorCode.InternalError,
-            `Operation failed: ${
-              error instanceof Error ? error.message : "Unknown error"
-            }`
+            error instanceof Error
+              ? error.message
+              : "An unknown error occurred"
           );
         }
       }
@@ -261,14 +369,41 @@ export class MemoryBankServer {
   }
 
   async run(): Promise<void> {
+    // Use the StdioServerTransport for communication with Cursor
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error("Memory Bank MCP server running on stdio");
+
+    console.log("Update Script MCP server started");
   }
 }
 
-// Start the server when loaded through npx
-const server = new MemoryBankServer();
-server.run().catch(console.error);
+async function main() {
+  try {
+    // Parse command line arguments for configuration
+    const args = process.argv.slice(2);
+    const config: Partial<UpdateScriptConfig> = {};
 
-export default MemoryBankServer;
+    let i = 0;
+    while (i < args.length) {
+      const arg = args[i];
+      if (arg === "--rootPath" && i + 1 < args.length) {
+        config.rootPath = args[i + 1];
+        i += 2;
+      } else {
+        // Skip unknown arguments
+        i++;
+      }
+    }
+
+    const server = new UpdateScriptServer(config);
+    await server.run();
+  } catch (error) {
+    console.error("Failed to start Update Script MCP server:", error);
+    process.exit(1);
+  }
+}
+
+main().catch((error) => {
+  console.error("Unhandled error:", error);
+  process.exit(1);
+});

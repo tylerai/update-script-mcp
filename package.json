@@ -1,32 +1,32 @@
 {
-  "name": "@allpepper/memory-bank-mcp",
-  "version": "0.1.7",
-  "description": "MCP server for remote management of project memory banks",
+  "name": "update-script-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for automatic project structure documentation",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/alioshr/memory-bank-mcp.git"
+    "url": "git+https://github.com/your-username/update-script-mcp.git"
   },
   "keywords": [
     "mcp",
-    "memory-bank",
-    "project-management",
+    "update-script",
+    "project-structure",
     "documentation",
-    "cline"
+    "cursor"
   ],
   "bugs": {
-    "url": "https://github.com/alioshr/memory-bank-mcp/issues"
+    "url": "https://github.com/your-username/update-script-mcp/issues"
   },
-  "homepage": "https://github.com/alioshr/memory-bank-mcp#readme",
+  "homepage": "https://github.com/your-username/update-script-mcp#readme",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist"
   ],
-  "author": "Aliosh Pimenta (alioshr)",
+  "author": "Your Name",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "mcp-server-memory-bank": "dist/index.js"
+    "update-script-mcp": "dist/index.js"
   },
   "scripts": {
     "build": "tsc && shx chmod +x dist/*.js",
@@ -36,13 +36,17 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.5.0",
-    "fs-extra": "^11.2.0"
+    "chokidar": "^3.5.3",
+    "fs-extra": "^11.2.0",
+    "glob": "^10.3.10"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
+    "@types/glob": "^8.1.0",
     "@types/node": "^20.11.19",
-    "typescript": "^5.3.3",
+    "shx": "^0.3.4",
+    "tailwindcss": "^3.4.1",
     "ts-node": "^10.9.2",
-    "shx": "^0.3.4"
+    "typescript": "^5.3.3"
   }
 }
