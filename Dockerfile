@@ -27,5 +27,5 @@ COPY --from=builder /app/dist /app/dist
 COPY --from=builder /app/node_modules /app/node_modules
 
 # Environment variables and default command
-ENV MEMORY_BANK_ROOT="/path/to/memory-bank"
+ENV UPDATE_SCRIPT_ROOT="/app/data"
 CMD ["node", "dist/index.js"]

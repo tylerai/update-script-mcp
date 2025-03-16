@@ -1,8 +1,29 @@
+# Dependencies
 node_modules
-.DS_Store
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Build artifacts
+dist
+build
+
+# Environment files
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
-dist
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage
+
+# IDE files
+.idea
+.vscode
+*.sublime-project
+*.sublime-workspace
