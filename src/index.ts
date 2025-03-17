@@ -15,6 +15,10 @@ import {
   UpdateScriptCommand,
   UpdateScriptConfig,
 } from "./types.js";
+import { execSync } from "child_process";
+import { resolve, join } from "path";
+import fs from "fs";
+import { memoryBankTool, generateMemoryBank } from "./mcp-tools.js";
 
 // Use types to fix Node process and console references
 declare global {
@@ -32,6 +36,10 @@ const DEFAULT_CONFIG: UpdateScriptConfig = {
 };
 
 interface RunUpdateArgs {
+  cwd?: string;
+}
+
+interface GenerateMemoryBankArgs {
   cwd?: string;
 }
 
@@ -71,18 +79,22 @@ interface CreateVisualDiagramArgs {
   outputPath?: string;
 }
 
-const updateScriptTools = {
+export const updateScriptTools = {
   run_update: {
     name: "run_update",
-    description: "Generate or update the project structure documentation",
+    description: "Generate or update the project structure documentation and comprehensive memory bank",
     inputSchema: {
       type: "object",
       properties: {
-        cwd: { type: "string" },
+        cwd: {
+          type: "string",
+          description: "The directory to generate documentation for",
+        },
       },
       required: [],
     },
   },
+  generate_memory_bank: memoryBankTool,
   list_updates: {
     name: "list_updates",
     description: "List recent update operations",
@@ -189,6 +201,7 @@ export class UpdateScriptServer {
         capabilities: {
           tools: {
             run_update: updateScriptTools.run_update,
+            generate_memory_bank: updateScriptTools.generate_memory_bank,
             list_updates: updateScriptTools.list_updates,
             watch_project: updateScriptTools.watch_project,
             stop_watching: updateScriptTools.stop_watching,
@@ -221,6 +234,7 @@ export class UpdateScriptServer {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: [
         updateScriptTools.run_update,
+        updateScriptTools.generate_memory_bank,
         updateScriptTools.list_updates,
         updateScriptTools.watch_project,
         updateScriptTools.stop_watching,
@@ -252,10 +266,9 @@ export class UpdateScriptServer {
             }
 
             case "run_update": {
-              const runArgs = this.validateArgs<RunUpdateArgs>(args);
               command = {
                 operation: "run_update",
-                cwd: runArgs.cwd,
+                cwd: this.validateArgs<RunUpdateArgs>(args).cwd,
               };
               break;
             }
@@ -324,6 +337,10 @@ export class UpdateScriptServer {
                 outputPath: diagramArgs.outputPath,
               };
               break;
+            }
+
+            case "generate_memory_bank": {
+              return await generateMemoryBank(request);
             }
 
             default:

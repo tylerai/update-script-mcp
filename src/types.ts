@@ -1,5 +1,6 @@
 export const OPERATIONS = [
   "run_update",
+  "generate_memory_bank",
   "list_updates",
   "watch_project",
   "stop_watching",
@@ -22,6 +23,10 @@ export interface BaseUpdateScriptCommand {
 
 export interface RunUpdateCommand extends BaseUpdateScriptCommand {
   operation: "run_update";
+}
+
+export interface GenerateMemoryBankCommand extends BaseUpdateScriptCommand {
+  operation: "generate_memory_bank";
 }
 
 export interface ListUpdatesCommand extends BaseUpdateScriptCommand {
@@ -67,6 +72,7 @@ export interface CreateVisualDiagramCommand extends BaseUpdateScriptCommand {
 
 export type UpdateScriptCommand =
   | RunUpdateCommand
+  | GenerateMemoryBankCommand
   | ListUpdatesCommand
   | WatchProjectCommand
   | StopWatchingCommand
