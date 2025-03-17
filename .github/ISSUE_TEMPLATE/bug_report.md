@@ -1,48 +1,44 @@
 ---
 name: Bug report
 about: Create a report to help us improve
-title: ""
-labels: "bug"
-assignees: ""
+title: "[BUG] "
+labels: bug
+assignees: ''
 ---
 
-**Describe the bug**
+## Bug Description
+
 A clear and concise description of what the bug is.
 
-**To Reproduce**
-Steps to reproduce the behavior:
+## Steps To Reproduce
 
-1. Configure MCP server with '...'
-2. Initialize project with '...'
-3. Try to access '...'
-4. See error
+1. Install '...'
+2. Run command '....'
+3. See error
 
-**Expected behavior**
+## Expected Behavior
+
 A clear and concise description of what you expected to happen.
 
-**Environment:**
+## Actual Behavior
 
-- OS: [e.g., macOS, Windows, Linux]
-- Node Version: [e.g., 18.x]
-- Package Version: [e.g., 0.1.0]
-- MCP Integration: [e.g., Cline extension, Claude desktop]
+What actually happened instead.
 
-**Memory Bank Configuration:**
+## Screenshots
 
-```json
-// Your MCP server configuration
-{
-  "memory-bank": {
-    ...
-  }
-}
-```
+If applicable, add screenshots to help explain your problem.
 
-**Error Output**
+## Environment
 
-```
-Paste any error messages or logs here
-```
+- OS: [e.g. macOS 14.3, Windows 11, Ubuntu 22.04]
+- Node.js version: [e.g. 18.12.0]
+- npm version: [e.g. 9.6.7]
+- update-script-mcp version: [e.g. 0.1.0]
+- Cursor IDE version: [e.g. 0.20.1]
 
-**Additional context**
-Add any other context about the problem here, such as project structure or specific memory bank files affected.
+## Additional Context
+
+Add any other context about the problem here. For example:
+- Error logs
+- Project structure
+- Special configuration

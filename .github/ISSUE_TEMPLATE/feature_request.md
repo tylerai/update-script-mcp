@@ -1,47 +1,36 @@
 ---
 name: Feature request
 about: Suggest an idea for this project
-title: ""
-labels: "enhancement"
-assignees: ""
+title: "[FEATURE] "
+labels: enhancement
+assignees: ''
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+## Feature Description
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+A clear and concise description of the feature you'd like to see added.
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+## Problem This Solves
 
-**Memory Bank Impact**
-How would this feature affect:
+Describe the problem or limitation that this feature would address.
 
-- Project isolation/security
-- Memory bank file structure
-- MCP tool interactions
-- User workflow
-- Configuration requirements
+## Proposed Solution
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+A clear and detailed description of how you envision this feature working.
 
-**Example Usage**
-If applicable, provide an example of how you envision using this feature:
+## Alternatives Considered
 
-```typescript
-// Example code or configuration
+A description of any alternative solutions or features you've considered.
+
+## Examples
+
+If possible, provide examples of how this feature might work in practice:
+
+```
+# Example code or usage
+update-script-mcp new-feature --option value
 ```
 
-or
+## Additional Context
 
-```json
-// Example MCP tool usage or configuration
-{
-  "tool_name": "new_feature",
-  "arguments": {
-    "param1": "value1"
-  }
-}
-```
+Add any other context, screenshots, or mockups about the feature request here.

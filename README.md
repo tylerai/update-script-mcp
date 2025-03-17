@@ -1,5 +1,11 @@
 # Update Script MCP
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub Actions](https://github.com/tylerbuilds/update-script-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/tylerbuilds/update-script-mcp/actions/workflows/ci.yml)
+[![GitHub issues](https://img.shields.io/github/issues/tylerbuilds/update-script-mcp)](https://github.com/tylerbuilds/update-script-mcp/issues)
+[![GitHub stars](https://img.shields.io/github/stars/tylerbuilds/update-script-mcp)](https://github.com/tylerbuilds/update-script-mcp/stargazers)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr/tylerbuilds/update-script-mcp)](https://github.com/tylerbuilds/update-script-mcp/pulls)
+
 An MCP (Model Context Protocol) server for automatically generating and maintaining project structure documentation. Designed to work seamlessly with Cursor IDE.
 
 ## Overview
@@ -35,15 +41,26 @@ Update Script MCP provides tools to automatically document your project's struct
 
 ### Installation
 
-```bash
-# Install globally from npm (recommended)
-npm install -g update-script-mcp
+Since the package is not yet published to npm, install from GitHub:
 
-# Verify installation
-update-script-mcp --version
+```bash
+# Clone the repository
+git clone https://github.com/tylerbuilds/update-script-mcp.git
+
+# Navigate to project directory
+cd update-script-mcp
+
+# Install dependencies
+npm install
+
+# Build the project
+npm run build
+
+# Create a symlink to make it accessible globally
+npm link
 ```
 
-For more installation options, see [how-to-install.md](how-to-install.md).
+For detailed installation and usage instructions, see [USAGE.md](USAGE.md).
 
 ### Using with Cursor IDE
 
@@ -190,7 +207,7 @@ If you encounter issues:
 2. Ensure the update-script-mcp command is in your PATH
 3. Try running with `--rootPath` set to a writable directory
 
-For more help, see [how-to-install.md](how-to-install.md).
+For more help, see [USAGE.md](USAGE.md).
 
 ## 📦 Dependencies
 

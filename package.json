@@ -4,25 +4,28 @@
   "description": "MCP server for automatic project structure documentation",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/your-username/update-script-mcp.git"
+    "url": "git+https://github.com/tylerbuilds/update-script-mcp.git"
   },
   "keywords": [
     "mcp",
     "update-script",
     "project-structure",
     "documentation",
-    "cursor"
+    "cursor",
+    "memory-bank",
+    "ai-assistant",
+    "project-documentation"
   ],
   "bugs": {
-    "url": "https://github.com/your-username/update-script-mcp/issues"
+    "url": "https://github.com/tylerbuilds/update-script-mcp/issues"
   },
-  "homepage": "https://github.com/your-username/update-script-mcp#readme",
+  "homepage": "https://github.com/tylerbuilds/update-script-mcp#readme",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist"
   ],
-  "author": "Your Name",
+  "author": "Update Script MCP Contributors",
   "license": "MIT",
   "type": "module",
   "bin": {
@@ -33,6 +36,12 @@
     "prepare": "npm run build",
     "dev": "ts-node src/index.ts",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.5.0",
