@@ -1,0 +1,18 @@
+{
+  "metrics": {
+    "content": "# Code Metrics Analysis\n\nGenerated on: 2025-03-17T21:36:20.621Z\n\n## Project Summary\n\n| Metric | Value |\n| ------ | ----- |\n| Total Files | 7 |\n| JavaScript Files | 3 |\n| TypeScript Files | 0 |\n| React Files | 2 |\n\n## Language Statistics\n\n| Language | Files | % of Codebase |\n| -------- | ----- | ------------- |\n| .js | 3 | 42.86% |\n| .jsx | 2 | 28.57% |\n| .md | 1 | 14.29% |\n| .json | 1 | 14.29% |\n",
+    "lastModified": "2025-03-17T21:36:20.639Z"
+  },
+  "diagram": {
+    "content": "```mermaid\nflowchart TD\n  dir0[Root]\n  dir1[docs]\n  dir2[analysis]\n  dir3[diagrams]\n  dir4[public]\n  dir5[src]\n  dir6[components]\n  dir7[hooks]\n  dir8[pages]\n  dir9[utils]\n  dir10[styles]\n  dir0 --> dir1\n  dir1 --> dir2\n  dir1 --> dir3\n  dir0 --> dir4\n  dir0 --> dir5\n  dir5 --> dir6\n  dir5 --> dir7\n  dir5 --> dir8\n  dir5 --> dir9\n  dir0 --> dir10\n```",
+    "lastModified": "2025-03-17T21:36:20.645Z"
+  },
+  "dependencies": {
+    "content": "# Dependency Analysis\n\n## Files Analyzed\n\nTotal files: 5\n\n## File Dependencies\n\n### ./esm-test.js\n\nImports:\n- path\n- fs\n- child_process\n- url\n\n### ./src/components/Button.jsx\n\nImports:\n- react\n\n### ./src/hooks/useLocalStorage.js\n\nImports:\n- react\n\n### ./src/pages/index.jsx\n\nImports:\n- next/head\n- react\n- ../components/Button\n- ../utils/dateUtils\n\n",
+    "lastModified": "2025-03-17T21:36:20.651Z"
+  },
+  "architecture": {
+    "content": "# AI-Optimized Project Memory Bank\n\n## 📋 Project Metadata\n\n- **Project Path:** `/Users/tyler/projects/update-script/test-project`\n- **Documentation Generated:** 2025-03-17T21:36:20.651Z\n\n- **Project Name:** test-next-app\n- **Project Description:** A test Next.js project\n- **Version:** 0.1.0\n\n## 📁 Project Structure\n\n### Directory Hierarchy\n```\n  docs/\n    analysis/\n    architecture/\n    diagrams/\n  public/\n  src/\n    components/\n    hooks/\n    pages/\n    utils/\n  styles/\n```\n\n",
+    "lastModified": "2025-03-17T21:36:20.658Z"
+  }
+}

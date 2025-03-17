@@ -175,8 +175,8 @@ export class DependencyAnalyzer {
   }
 
   // Formats the dependency graph in different formats
-  formatGraph(format: 'json' | 'markdown' | 'dot'): string {
-    const graph = this.analyze();
+  async formatGraph(format: 'json' | 'markdown' | 'dot'): Promise<string> {
+    const graph = await this.analyze();
 
     switch (format) {
       case 'json':

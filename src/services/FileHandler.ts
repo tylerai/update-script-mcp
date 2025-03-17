@@ -1,18 +1,30 @@
 import fs from "fs-extra";
-import { join } from "path";
+import { join, resolve } from "path";
 import { execSync } from "child_process";
 import chokidar from "chokidar";
 import {
   UpdateScriptCommand,
-  CommandResult,
   UpdateScriptConfig,
+  UpdateScriptResult,
+  AnalyzeDependenciesCommand,
+  GenerateMetricsCommand,
+  CreateVisualDiagramCommand,
+  GenerateMemoryBankCommand,
 } from "../types.js";
+import { ServerResult } from "@modelcontextprotocol/sdk/types.js";
 
 // Import new analyzers and template generators
 import { TemplateGenerator } from '../templates/TemplateGenerator.js';
 import { DependencyAnalyzer } from '../analyzers/DependencyAnalyzer.js';
 import { MetricsAnalyzer } from '../analyzers/MetricsAnalyzer.js';
 import { DiagramGenerator } from '../analyzers/DiagramGenerator.js';
+
+import { 
+  analyzeMetrics,
+  createVisualDiagram,
+  analyzeDependencies,
+  generateMemoryBank,
+} from "../mcp-tools.js";
 
 interface UpdateRecord {
   timestamp: string;
@@ -27,13 +39,24 @@ interface HistoryData {
 // Map to store active watchers by project path
 const activeWatchers = new Map<string, chokidar.FSWatcher>();
 
+const DEFAULT_CONFIG: UpdateScriptConfig = {
+  rootDir: process.cwd(),
+  outputDir: "docs",
+  templateDir: "templates",
+  watchDebounceMs: 1000,
+};
+
 export class FileHandler {
+  private config: UpdateScriptConfig;
+  private watchedDirectories: Map<string, NodeJS.Timeout>;
   private rootPath: string;
   private historyPath: string;
   
-  constructor(config: UpdateScriptConfig) {
-    this.rootPath = config.rootPath;
-    this.historyPath = join(this.rootPath, "history.json");
+  constructor(config: Partial<UpdateScriptConfig> = {}) {
+    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.watchedDirectories = new Map();
+    this.rootPath = this.config.rootDir;
+    this.historyPath = resolve(this.rootPath, "history.json");
     this.ensureHistoryFile();
   }
   
@@ -189,7 +212,7 @@ export class FileHandler {
     }
   }
   
-  private async startWatching(cwd: string, debounceMs = 1000): Promise<CommandResult> {
+  private async startWatching(cwd: string, debounceMs = 1000): Promise<UpdateScriptResult> {
     const projectPath = cwd || process.cwd();
     
     // Check if already watching this project
@@ -256,7 +279,7 @@ export class FileHandler {
     }
   }
   
-  private async stopWatching(cwd: string): Promise<CommandResult> {
+  private async stopWatching(cwd: string): Promise<UpdateScriptResult> {
     const projectPath = cwd || process.cwd();
     
     // Check if we're watching this project
@@ -290,7 +313,7 @@ export class FileHandler {
     }
   }
   
-  private async handleUpdateOperation(cwd: string): Promise<CommandResult> {
+  private async handleUpdateOperation(cwd: string): Promise<UpdateScriptResult> {
     try {
       // Check if there's a custom update script
       const customScriptPath = join(cwd, '.scripts/update_structure.sh');
@@ -326,79 +349,92 @@ export class FileHandler {
     }
   }
   
-  public async handleCommand(
-    command: UpdateScriptCommand
-  ): Promise<CommandResult> {
+  public async handleCommand(command: UpdateScriptCommand): Promise<UpdateScriptResult> {
     try {
-      if (command.operation === "list_updates") {
-        if (fs.existsSync(this.historyPath)) {
-          const historyContent = fs.readFileSync(this.historyPath, 'utf8');
-          return {
-            success: true,
-            content: historyContent
-          };
-        }
-        return {
-          success: true,
-          content: JSON.stringify({ updates: [] })
-        };
-      }
-      
-      if (command.operation === "run_update") {
-        const cwd = command.cwd || process.cwd();
-        return this.handleUpdateOperation(cwd);
-      }
-      
-      if (command.operation === "watch_project") {
-        const cwd = command.cwd || process.cwd();
-        const debounceMs = command.debounceMs || 1000;
-        return this.startWatching(cwd, debounceMs);
-      }
-      
-      if (command.operation === "stop_watching") {
-        const cwd = command.cwd || process.cwd();
-        return this.stopWatching(cwd);
-      }
-      
-      if (command.operation === "generate_memory_bank") {
-        const cwd = command.cwd || process.cwd();
-        try {
-          const memoryFile = await this.generateProjectMemory(cwd);
-          await this.saveUpdateToHistory(true, `Memory bank generated: ${memoryFile}`);
-          return {
-            success: true,
-            content: `Project memory bank generated and saved to ${memoryFile}`
-          };
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          await this.saveUpdateToHistory(false, `Error generating memory bank: ${errorMessage}`);
+      switch (command.operation) {
+        case "list_updates":
+          return await this.listUpdates();
+
+        case "run_update":
+          return await this.runUpdate(command.cwd);
+
+        case "watch_project":
+          return await this.watchProject(command.cwd, command.debounceMs);
+
+        case "stop_watching":
+          return await this.stopWatching(command.cwd);
+
+        case "custom_template_js":
+          return await this.generateCustomTemplate(command.projectName, command.projectPath);
+
+        case "analyze_dependencies":
+          return await this.analyzeDependencies(command);
+
+        case "generate_metrics":
+          return await this.generateMetrics(command);
+
+        case "create_visual_diagram":
+          return await this.createVisualDiagram(command);
+
+        case "generate_memory_bank":
+          return await this.generateMemoryBank(command);
+
+        default:
           return {
             success: false,
-            error: `Failed to generate project memory bank: ${errorMessage}`
+            error: `Unknown operation: ${(command as UpdateScriptCommand).operation}`,
           };
-        }
       }
-      
-      return {
-        success: false,
-        error: "Invalid operation"
-      };
     } catch (error) {
       return {
         success: false,
-        error: `Operation failed: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
+        error: error instanceof Error ? error.message : "Unknown error occurred",
       };
     }
   }
 
-  // NEW METHODS FOR CUSTOM TEMPLATE
+  private async listUpdates(): Promise<UpdateScriptResult> {
+    if (fs.existsSync(this.historyPath)) {
+      const historyContent = fs.readFileSync(this.historyPath, 'utf8');
+      return {
+        success: true,
+        content: historyContent
+      };
+    }
+    return {
+      success: true,
+      content: JSON.stringify({ updates: [] })
+    };
+  }
 
-  private async applyCustomTemplateJs(
-    projectName: string = 'new-js-project',
-    projectPath: string = ''
-  ): Promise<CommandResult> {
+  private async runUpdate(cwd: string): Promise<UpdateScriptResult> {
+    return this.handleUpdateOperation(cwd);
+  }
+
+  private async watchProject(
+    cwd: string,
+    debounceMs = this.config.watchDebounceMs
+  ): Promise<UpdateScriptResult> {
+    if (this.watchedDirectories.has(cwd)) {
+      return {
+        success: false,
+        error: `Directory ${cwd} is already being watched`,
+      };
+    }
+
+    const timeoutId = setTimeout(() => {
+      // Implementation for watching project
+    }, debounceMs);
+
+    this.watchedDirectories.set(cwd, timeoutId);
+
+    return this.startWatching(cwd, debounceMs);
+  }
+
+  private async generateCustomTemplate(
+    projectName: string,
+    projectPath: string
+  ): Promise<UpdateScriptResult> {
     try {
       // If project path is not specified, use current directory + project name
       const targetPath = projectPath || join(process.cwd(), projectName);
@@ -423,141 +459,119 @@ export class FileHandler {
     }
   }
 
-  // NEW METHODS FOR DEPENDENCY ANALYSIS
-
   private async analyzeDependencies(
-    cwd: string,
-    format: 'json' | 'markdown' | 'dot' = 'markdown',
-    includeNodeModules = false,
-    depth = 3
-  ): Promise<CommandResult> {
+    command: AnalyzeDependenciesCommand
+  ): Promise<UpdateScriptResult> {
     try {
-      const analyzer = new DependencyAnalyzer(cwd, includeNodeModules, depth);
-      
-      // Create output directory if it doesn't exist
-      const outputDir = join(cwd, 'docs', 'analysis');
-      await fs.ensureDir(outputDir);
-      
-      let outputContent = '';
-      let outputFile = '';
-      
-      switch (format) {
-        case 'json':
-          outputContent = JSON.stringify(await analyzer.analyze(), null, 2);
-          outputFile = join(outputDir, 'dependencies.json');
-          break;
-          
-        case 'dot':
-          outputContent = await analyzer.formatGraph('dot');
-          outputFile = join(outputDir, 'dependencies.dot');
-          break;
-          
-        case 'markdown':
-        default:
-          outputContent = await analyzer.formatGraph('markdown');
-          outputFile = join(outputDir, 'dependencies.md');
-          break;
-      }
-      
-      // Write the output to a file
-      await fs.writeFile(outputFile, outputContent);
-      
+      const result = await analyzeDependencies({
+        params: {
+          name: "analyze_dependencies",
+          arguments: {
+            cwd: command.cwd,
+            format: command.format,
+            includeNodeModules: command.includeNodeModules,
+            depth: command.depth,
+          },
+        },
+        method: "tools/call",
+      }) as { content: Array<{ text: string }> };
+
       return {
         success: true,
-        content: `Dependency analysis complete! Output saved to ${outputFile}`,
+        content: result.content?.[0]?.text || "Dependencies analyzed successfully",
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : "Failed to analyze dependencies",
       };
     }
   }
-
-  // NEW METHODS FOR METRICS
 
   private async generateMetrics(
-    cwd: string,
-    includeComplexity = true,
-    includeCoverage = false,
-    includeLocMetrics = true,
-    outputFormat: 'json' | 'markdown' = 'markdown'
-  ): Promise<CommandResult> {
+    command: GenerateMetricsCommand
+  ): Promise<UpdateScriptResult> {
     try {
-      const analyzer = new MetricsAnalyzer(
-        cwd,
-        includeComplexity,
-        includeCoverage,
-        includeLocMetrics
-      );
-      
-      // Create output directory if it doesn't exist
-      const outputDir = join(cwd, 'docs', 'analysis');
-      await fs.ensureDir(outputDir);
-      
-      let outputContent = '';
-      let outputFile = '';
-      
-      if (outputFormat === 'json') {
-        outputContent = await analyzer.formatJson();
-        outputFile = join(outputDir, 'metrics.json');
-      } else {
-        outputContent = await analyzer.formatMarkdown();
-        outputFile = join(outputDir, 'metrics.md');
-      }
-      
-      // Write the output to a file
-      await fs.writeFile(outputFile, outputContent);
-      
+      const result = await analyzeMetrics({
+        params: {
+          name: "generate_metrics",
+          arguments: {
+            cwd: command.cwd,
+            includeComplexity: command.includeComplexity,
+            includeCoverage: command.includeCoverage,
+            includeLocMetrics: command.includeLocMetrics,
+            outputFormat: command.outputFormat,
+          },
+        },
+        method: "tools/call",
+      }) as { content: Array<{ text: string }> };
+
       return {
         success: true,
-        content: `Code metrics analysis complete! Output saved to ${outputFile}`,
+        content: result.content?.[0]?.text || "Metrics generated successfully",
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : "Failed to generate metrics",
       };
     }
   }
 
-  // NEW METHODS FOR VISUAL DIAGRAMS
-
   private async createVisualDiagram(
-    cwd: string,
-    type: 'structure' | 'dependencies' | 'components' | 'all' = 'structure',
-    format: 'mermaid' | 'dot' | 'svg' | 'png' = 'mermaid',
-    outputPath?: string
-  ): Promise<CommandResult> {
+    command: CreateVisualDiagramCommand
+  ): Promise<UpdateScriptResult> {
     try {
-      const generator = new DiagramGenerator({
-        type,
-        format,
-        cwd,
-        outputPath,
-      });
-      
-      // Create output directory if it doesn't exist
-      const outputDir = outputPath || join(cwd, 'docs', 'diagrams');
-      await fs.ensureDir(outputDir);
-      
-      const diagram = await generator.generate();
-      
-      // Determine filename based on type and format
-      const filename = `${type}-diagram.${format === 'mermaid' ? 'md' : format}`;
-      const outputFile = join(outputDir, filename);
-      
-      // Write the diagram to a file
-      await fs.writeFile(outputFile, diagram);
-      
+      const result = await createVisualDiagram({
+        params: {
+          name: "create_visual_diagram",
+          arguments: {
+            cwd: command.cwd,
+            type: command.type,
+            format: command.format,
+            outputPath: command.outputPath,
+          },
+        },
+        method: "tools/call",
+      }) as { content: Array<{ text: string }> };
+
       return {
         success: true,
-        content: `Visual diagram created! Output saved to ${outputFile}`,
+        content: result.content?.[0]?.text || "Visual diagram created successfully",
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : "Failed to create visual diagram",
+      };
+    }
+  }
+
+  private async generateMemoryBank(
+    command: GenerateMemoryBankCommand
+  ): Promise<UpdateScriptResult> {
+    try {
+      const result = await generateMemoryBank({
+        params: {
+          name: "generate_memory_bank",
+          arguments: {
+            cwd: command.cwd,
+            format: command.format,
+            includeMetrics: command.includeMetrics,
+            includeDiagrams: command.includeDiagrams,
+          },
+        },
+        method: "tools/call",
+      }) as { content: Array<{ text: string }> };
+
+      return {
+        success: true,
+        content: result.content?.[0]?.text || "Memory bank generated successfully",
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to generate memory bank",
       };
     }
   }

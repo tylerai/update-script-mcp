@@ -68,7 +68,7 @@ export class DiagramGenerator {
         return this.dependenciesToMermaid(dependencies);
         
       case 'dot':
-        return analyzer.formatGraph('dot');
+        return await analyzer.formatGraph('dot');
         
       default:
         return this.dependenciesToMermaid(dependencies);

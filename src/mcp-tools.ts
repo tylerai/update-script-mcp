@@ -15,6 +15,11 @@ import fs from 'fs';
 import { join, resolve } from 'path';
 import { execSync } from 'child_process';
 
+// Add imports for analyzers
+import { MetricsAnalyzer } from './analyzers/MetricsAnalyzer.js';
+import { DiagramGenerator } from './analyzers/DiagramGenerator.js';
+import { DependencyAnalyzer } from './analyzers/DependencyAnalyzer.js';
+
 // Memory bank generator tool definition
 export const memoryBankTool = {
   name: "generate_memory_bank",
@@ -25,6 +30,93 @@ export const memoryBankTool = {
       cwd: {
         type: "string",
         description: "The directory to generate the memory bank for (defaults to current working directory)",
+      },
+    },
+    required: [],
+  },
+};
+
+// Add new tool definitions
+export const metricsAnalyzerTool = {
+  name: "analyze_metrics",
+  description: "Analyze code metrics including complexity, lines of code, functions, etc.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      cwd: {
+        type: "string",
+        description: "The directory to analyze (defaults to current working directory)",
+      },
+      includeComplexity: {
+        type: "boolean",
+        description: "Whether to include complexity metrics",
+        default: true,
+      },
+      includeCoverage: {
+        type: "boolean",
+        description: "Whether to include coverage data",
+        default: false,
+      },
+      includeLocMetrics: {
+        type: "boolean",
+        description: "Whether to include lines of code metrics",
+        default: true,
+      },
+    },
+    required: [],
+  },
+};
+
+export const diagramGeneratorTool = {
+  name: "create_visual_diagram",
+  description: "Create visual diagrams of project structure, dependencies, or components",
+  inputSchema: {
+    type: "object",
+    properties: {
+      cwd: {
+        type: "string",
+        description: "The directory to analyze (defaults to current working directory)",
+      },
+      type: {
+        type: "string",
+        enum: ["structure", "dependencies", "components", "all"],
+        description: "Type of diagram to generate",
+        default: "all",
+      },
+      format: {
+        type: "string",
+        enum: ["mermaid", "dot", "svg", "png"],
+        description: "Output format for the diagram",
+        default: "mermaid",
+      },
+      outputPath: {
+        type: "string",
+        description: "Custom output path for the diagram",
+      },
+    },
+    required: [],
+  },
+};
+
+export const dependencyAnalyzerTool = {
+  name: "analyze_dependencies",
+  description: "Analyze project dependencies and generate a dependency graph",
+  inputSchema: {
+    type: "object",
+    properties: {
+      cwd: {
+        type: "string",
+        description: "The directory to analyze (defaults to current working directory)",
+      },
+      includeNodeModules: {
+        type: "boolean",
+        description: "Whether to include node_modules in the analysis",
+        default: false,
+      },
+      maxDepth: {
+        type: "number",
+        description: "Maximum depth for dependency analysis",
+        default: 2,
       },
     },
     required: [],
@@ -214,6 +306,75 @@ export async function generateMemoryBank(request: CallToolRequest): Promise<Serv
     markdown += `---\n\n`;
     markdown += `*This AI-optimized memory bank was generated on ${new Date().toLocaleString()} to facilitate project comprehension.*`;
     
+    // Add code metrics section
+    markdown += `## 📊 Code Metrics\n\n`;
+    
+    try {
+      const metricsAnalyzer = new MetricsAnalyzer(cwd, true, false, true);
+      const metrics = await metricsAnalyzer.analyze();
+      
+      markdown += `### Project Summary\n\n`;
+      markdown += `- Total Files: ${metrics.summary.totalFiles}\n`;
+      markdown += `- Lines of Code: ${metrics.summary.totalLoc}\n`;
+      markdown += `- Source Lines of Code: ${metrics.summary.totalSloc}\n`;
+      markdown += `- Comments: ${metrics.summary.totalComments}\n`;
+      markdown += `- Functions: ${metrics.summary.totalFunctions}\n`;
+      markdown += `- Classes: ${metrics.summary.totalClasses}\n`;
+      markdown += `- Average Complexity: ${metrics.summary.averageComplexity.toFixed(2)}\n\n`;
+      
+      markdown += `### Language Distribution\n\n`;
+      for (const [lang, stats] of Object.entries(metrics.byLanguage)) {
+        markdown += `- ${lang}: ${stats.files} files, ${stats.loc} lines\n`;
+      }
+      markdown += `\n`;
+      
+      markdown += `### Most Complex Files\n\n`;
+      metrics.topComplexFiles.slice(0, 5).forEach(file => {
+        markdown += `- \`${file.filePath}\` (Complexity: ${file.complexity})\n`;
+      });
+      markdown += `\n`;
+    } catch (error) {
+      console.error('Error generating metrics:', error);
+      markdown += `*Error generating metrics*\n\n`;
+    }
+    
+    // Add visual diagrams section
+    markdown += `## 📈 Visual Diagrams\n\n`;
+    
+    try {
+      const diagramGenerator = new DiagramGenerator({
+        type: 'all',
+        format: 'mermaid',
+        cwd
+      });
+      
+      const diagrams = await diagramGenerator.generate();
+      markdown += diagrams + '\n\n';
+    } catch (error) {
+      console.error('Error generating diagrams:', error);
+      markdown += `*Error generating diagrams*\n\n`;
+    }
+    
+    // Add dependency analysis
+    markdown += `## 🔄 Dependency Analysis\n\n`;
+    
+    try {
+      const depAnalyzer = new DependencyAnalyzer(cwd, false, 2);
+      const deps = await depAnalyzer.analyze();
+      
+      markdown += `### Key Dependencies\n\n`;
+      deps.nodes.slice(0, 10).forEach(node => {
+        markdown += `- \`${node.id}\` depends on:\n`;
+        node.dependencies.slice(0, 5).forEach(dep => {
+          markdown += `  - \`${dep}\`\n`;
+        });
+      });
+      markdown += `\n`;
+    } catch (error) {
+      console.error('Error analyzing dependencies:', error);
+      markdown += `*Error analyzing dependencies*\n\n`;
+    }
+    
     // Write the markdown to the file
     fs.writeFileSync(memoryBankPath, markdown);
     
@@ -230,6 +391,174 @@ export async function generateMemoryBank(request: CallToolRequest): Promise<Serv
     throw new McpError(
       ErrorCode.InternalError,
       `Failed to generate memory bank: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+// Function to analyze metrics
+export async function analyzeMetrics(request: CallToolRequest): Promise<ServerResult> {
+  try {
+    const args = request.params.arguments as {
+      cwd?: string;
+      includeComplexity?: boolean;
+      includeCoverage?: boolean;
+      includeLocMetrics?: boolean;
+      outputFormat?: 'json' | 'markdown';
+    };
+
+    const cwd = args?.cwd || process.cwd();
+    const analyzer = new MetricsAnalyzer(
+      cwd,
+      args?.includeComplexity ?? true,
+      args?.includeCoverage ?? false,
+      args?.includeLocMetrics ?? true
+    );
+
+    // Create output directory
+    const outputDir = join(cwd, 'docs/analysis');
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    // Generate metrics in requested format
+    const outputFormat = args?.outputFormat || 'markdown';
+    const content = outputFormat === 'json' 
+      ? await analyzer.formatJson()
+      : await analyzer.formatMarkdown();
+
+    // Write to file
+    const outputFile = join(outputDir, `metrics.${outputFormat}`);
+    fs.writeFileSync(outputFile, content);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Metrics analysis complete! Output saved to ${outputFile}`,
+        },
+      ],
+      isError: false,
+    };
+  } catch (error) {
+    throw new McpError(
+      ErrorCode.InternalError,
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+}
+
+// Function to create visual diagrams
+export async function createVisualDiagram(request: CallToolRequest): Promise<ServerResult> {
+  try {
+    const args = request.params.arguments as {
+      cwd?: string;
+      type?: 'structure' | 'dependencies' | 'components' | 'all';
+      format?: 'mermaid' | 'dot' | 'svg' | 'png';
+      outputPath?: string;
+    };
+
+    const cwd = args?.cwd || process.cwd();
+    const generator = new DiagramGenerator({
+      type: args?.type || 'structure',
+      format: args?.format || 'mermaid',
+      cwd,
+      outputPath: args?.outputPath,
+    });
+
+    // Create output directory
+    const outputDir = args?.outputPath || join(cwd, 'docs/diagrams');
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    // Generate diagram
+    const diagram = await generator.generate();
+
+    // Determine filename based on type and format
+    const filename = `${args?.type || 'structure'}-diagram.${args?.format === 'mermaid' ? 'md' : args?.format || 'mermaid'}`;
+    const outputFile = join(outputDir, filename);
+
+    // Write to file
+    fs.writeFileSync(outputFile, diagram);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Visual diagram created! Output saved to ${outputFile}`,
+        },
+      ],
+      isError: false,
+    };
+  } catch (error) {
+    throw new McpError(
+      ErrorCode.InternalError,
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+}
+
+// Function to analyze dependencies
+export async function analyzeDependencies(request: CallToolRequest): Promise<ServerResult> {
+  try {
+    const args = request.params.arguments as {
+      cwd?: string;
+      format?: 'json' | 'markdown' | 'dot';
+      includeNodeModules?: boolean;
+      depth?: number;
+    };
+
+    const cwd = args?.cwd || process.cwd();
+    const analyzer = new DependencyAnalyzer(
+      cwd,
+      args?.includeNodeModules ?? false,
+      args?.depth ?? 3
+    );
+
+    // Create output directory
+    const outputDir = join(cwd, 'docs/analysis');
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    // Generate dependency analysis in requested format
+    const format = args?.format || 'markdown';
+    let content = '';
+    let extension = '';
+
+    switch (format) {
+      case 'json':
+        content = JSON.stringify(await analyzer.analyze(), null, 2);
+        extension = 'json';
+        break;
+      case 'dot':
+        content = await analyzer.formatGraph('dot');
+        extension = 'dot';
+        break;
+      case 'markdown':
+      default:
+        content = await analyzer.formatGraph('markdown');
+        extension = 'md';
+        break;
+    }
+
+    // Write to file
+    const outputFile = join(outputDir, `dependencies.${extension}`);
+    fs.writeFileSync(outputFile, content);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Dependency analysis complete! Output saved to ${outputFile}`,
+        },
+      ],
+      isError: false,
+    };
+  } catch (error) {
+    throw new McpError(
+      ErrorCode.InternalError,
+      error instanceof Error ? error.message : String(error)
     );
   }
 } 

@@ -253,8 +253,6 @@ export class MetricsAnalyzer {
     const totalComplexity = allFiles.reduce((sum, file) => sum + file.complexity, 0);
     const totalSize = allFiles.reduce((sum, file) => sum + file.fileSize, 0);
     
-    const averageComplexity = totalComplexity / totalFiles || 0;
-    
     return {
       totalFiles,
       totalLoc,
@@ -262,71 +260,72 @@ export class MetricsAnalyzer {
       totalComments,
       totalFunctions,
       totalClasses,
-      averageComplexity,
+      averageComplexity: totalComplexity / totalFiles || 0,
       totalSize,
     };
   }
   
-  // Format metrics as markdown
-  async formatMarkdown(): Promise<string> {
-    const metrics = await this.analyze();
-    
-    let output = '# Project Code Metrics\n\n';
-    output += `*Generated on: ${new Date().toLocaleString()}*\n\n`;
-    
-    output += '## Summary\n\n';
-    output += '| Metric | Value |\n';
-    output += '| ------ | ----- |\n';
-    output += `| Total Files | ${metrics.summary.totalFiles} |\n`;
-    output += `| Lines of Code | ${metrics.summary.totalLoc} |\n`;
-    output += `| Source Lines of Code | ${metrics.summary.totalSloc} |\n`;
-    output += `| Comment Lines | ${metrics.summary.totalComments} |\n`;
-    output += `| Functions | ${metrics.summary.totalFunctions} |\n`;
-    output += `| Classes | ${metrics.summary.totalClasses} |\n`;
-    output += `| Average Complexity | ${metrics.summary.averageComplexity.toFixed(2)} |\n`;
-    output += `| Total Size | ${(metrics.summary.totalSize / 1024).toFixed(2)} KB |\n\n`;
-    
-    // Language breakdown
-    output += '## Language Breakdown\n\n';
-    output += '| Language | Files | Lines of Code | Source Lines of Code |\n';
-    output += '| -------- | ----- | ------------- | -------------------- |\n';
-    
-    for (const [lang, stats] of Object.entries(metrics.byLanguage)) {
-      output += `| ${lang || 'other'} | ${stats.files} | ${stats.loc} | ${stats.sloc} |\n`;
-    }
-    
-    output += '\n';
-    
-    // Most complex files
-    output += '## Most Complex Files\n\n';
-    output += '| File | Complexity | Lines of Code | Functions |\n';
-    output += '| ---- | ---------- | ------------- | --------- |\n';
-    
-    for (const file of metrics.topComplexFiles) {
-      output += `| \`${file.filePath}\` | ${file.complexity} | ${file.loc} | ${file.functions} |\n`;
-    }
-    
-    output += '\n';
-    
-    // Top directories by code size
-    output += '## Directory Statistics\n\n';
-    output += '| Directory | Files | Lines of Code | Avg. Complexity |\n';
-    output += '| --------- | ----- | ------------- | --------------- |\n';
-    
-    const sortedDirs = [...metrics.byDirectory]
-      .sort((a, b) => b.metrics.loc - a.metrics.loc)
-      .slice(0, 10);
-    
-    for (const dir of sortedDirs) {
-      output += `| \`${dir.dirPath || '.'}\` | ${dir.totalFiles} | ${dir.metrics.loc} | ${dir.metrics.averageComplexity.toFixed(2)} |\n`;
-    }
-    
-    return output;
-  }
-  
-  // Format metrics as JSON
   async formatJson(): Promise<string> {
     const metrics = await this.analyze();
     return JSON.stringify(metrics, null, 2);
+  }
+
+  async formatMarkdown(): Promise<string> {
+    const metrics = await this.analyze();
+    let markdown = `# Code Metrics Analysis\n\n`;
+    markdown += `Generated on: ${metrics.timestamp}\n\n`;
+
+    // Project Summary
+    markdown += `## Project Summary\n\n`;
+    markdown += `- Total Files: ${metrics.summary.totalFiles}\n`;
+    markdown += `- Total Lines of Code: ${metrics.summary.totalLoc}\n`;
+    markdown += `- Source Lines of Code: ${metrics.summary.totalSloc}\n`;
+    markdown += `- Comment Lines: ${metrics.summary.totalComments}\n`;
+    markdown += `- Total Functions: ${metrics.summary.totalFunctions}\n`;
+    markdown += `- Total Classes: ${metrics.summary.totalClasses}\n`;
+    markdown += `- Average Complexity: ${metrics.summary.averageComplexity.toFixed(2)}\n`;
+    markdown += `- Total Size: ${(metrics.summary.totalSize / 1024).toFixed(2)} KB\n\n`;
+
+    // Language Statistics
+    markdown += `## Language Statistics\n\n`;
+    markdown += `| Language | Files | Lines of Code | Source Lines |\n`;
+    markdown += `|----------|--------|--------------|--------------|`;
+    Object.entries(metrics.byLanguage).forEach(([lang, stats]) => {
+      markdown += `\n| ${lang} | ${stats.files} | ${stats.loc} | ${stats.sloc} |`;
+    });
+    markdown += `\n\n`;
+
+    // Top Complex Files
+    markdown += `## Most Complex Files\n\n`;
+    markdown += `| File | Complexity | Functions | Classes | Lines of Code |\n`;
+    markdown += `|------|------------|-----------|---------|--------------|`;
+    metrics.topComplexFiles.forEach(file => {
+      markdown += `\n| ${file.filePath} | ${file.complexity} | ${file.functions} | ${file.classes} | ${file.loc} |`;
+    });
+    markdown += `\n\n`;
+
+    // Directory Metrics
+    markdown += `## Directory Metrics\n\n`;
+    metrics.byDirectory.forEach(dir => {
+      markdown += `### ${dir.dirPath || '/'}\n\n`;
+      markdown += `- Files: ${dir.totalFiles}\n`;
+      markdown += `- Lines of Code: ${dir.metrics.loc}\n`;
+      markdown += `- Source Lines: ${dir.metrics.sloc}\n`;
+      markdown += `- Comments: ${dir.metrics.comments}\n`;
+      markdown += `- Functions: ${dir.metrics.functions}\n`;
+      markdown += `- Classes: ${dir.metrics.classes}\n`;
+      markdown += `- Average Complexity: ${dir.metrics.averageComplexity.toFixed(2)}\n`;
+      markdown += `- Size: ${(dir.metrics.totalSize / 1024).toFixed(2)} KB\n\n`;
+
+      if (dir.topComplexFiles.length > 0) {
+        markdown += `Most complex files in this directory:\n\n`;
+        dir.topComplexFiles.forEach(file => {
+          markdown += `- ${file.filePath} (complexity: ${file.complexity})\n`;
+        });
+        markdown += `\n`;
+      }
+    });
+
+    return markdown;
   }
 } 
